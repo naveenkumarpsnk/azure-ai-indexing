@@ -155,7 +155,7 @@ def ensure_index(search_endpoint, search_key, index_name):
     except ImportError:
         logging.warning("Azure Search SDK not installed, skipping index creation.")
         return
-
+    print("inside ensure_index")
     index_client = SearchIndexClient(search_endpoint, AzureKeyCredential(search_key))
     if index_name not in [idx.name for idx in index_client.list_indexes()]:
         fields = [
@@ -165,12 +165,15 @@ def ensure_index(search_endpoint, search_key, index_name):
         index = SearchIndex(name=index_name, fields=fields)
         index_client.create_index(index)
         logging.info(f"Created index: {index_name}")
+    else:
+        logging.info(f"Index {index_name} already exists.")
 
 
-def upload_documents(search_endpoint, search_key, index_name, docs):
+def upload_documents(search_endpoint, search_key, index_name, docs, batch_size=500):
     if not docs:
-        logging.info("No documents to upload.")
+        print("No documents to upload.")
         return
+
     try:
         from azure.core.credentials import AzureKeyCredential
         from azure.search.documents import SearchClient
@@ -178,9 +181,17 @@ def upload_documents(search_endpoint, search_key, index_name, docs):
         logging.warning("Azure Search SDK not installed, skipping document upload.")
         return
 
+    print("inside upload_documents")
+
     search_client = SearchClient(search_endpoint, index_name, AzureKeyCredential(search_key))
-    result = search_client.upload_documents(documents=docs)
-    logging.info(f"Upload result: {result}")
+
+    for i in range(0, len(docs), batch_size):
+        batch = docs[i:i + batch_size]
+        try:
+            result = search_client.upload_documents(documents=batch)
+            print(f"Uploaded batch {i // batch_size + 1} ({len(batch)} docs) → Result: {result}")
+        except Exception as e:
+            logging.error(f"Failed to upload batch {i // batch_size + 1}: {e}")
 
 def sanitize_id(s: str) -> str:
 # Replace invalid characters with underscore
